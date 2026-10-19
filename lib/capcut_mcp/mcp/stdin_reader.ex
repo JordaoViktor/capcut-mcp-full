@@ -11,21 +11,27 @@ defmodule CapcutMcp.MCP.StdinReader do
 
   use Task, restart: :transient
   require Logger
+  alias CapcutMcp.MCP.StdioEncoding
 
   @spec start_link(keyword()) :: {:ok, pid()}
-  def start_link(opts) do
+  def start_link(opts \\ []) do
     target = Keyword.get(opts, :target, CapcutMcp.MCP.Server)
     Task.start_link(__MODULE__, :loop, [target])
   end
 
   @doc false
   def loop(target) do
-    # `binread`, not `IO.read`: under `-noshell` stdio is latin1, so `IO.read`
-    # would corrupt any non-ASCII (UTF-8) bytes in an incoming request — e.g. a
-    # project name argument with an accent. Reading raw bytes keeps the JSON-RPC
-    # transport byte-clean UTF-8 end to end (see the matching `binwrite` on the
-    # response side in `CapcutMcp.MCP.Server`).
-    case IO.binread(:stdio, :line) do
+    # `IO.read`, not `IO.binread`: both `mix run` and the release run stdio in
+    # unicode mode, and `binread` asks the io server for a *latin1* reply — it
+    # decodes the incoming UTF-8 and re-encodes each codepoint as one latin1
+    # byte (ç → 0xE7; "●" has no latin1 form at all). `Jason.decode` then
+    # rejects the mangled line as invalid UTF-8 and every request with non-ASCII
+    # died as a bare "Parse error". With the device pinned to UTF-8
+    # (`StdioEncoding.ensure_utf8/0`), `IO.read` returns a proper UTF-8
+    # string; see the matching `IO.write` in `CapcutMcp.MCP.Server`.
+    StdioEncoding.ensure_utf8()
+
+    case IO.read(:stdio, :line) do
       :eof ->
         send_to(target, :eof)
 

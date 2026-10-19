@@ -1,25 +1,37 @@
 defmodule CapcutMcp.MCP.ServerEncodingTest do
   @moduledoc """
-  Regression test for the "Bad escaped character in JSON" bug.
+  Regression tests for the stdio encoding of the JSON-RPC transport.
 
-  Under `-noshell` (both `mix run --no-halt` and the release), the BEAM's
-  stdio device defaults to latin1. `IO.puts/2` on a latin1 device escapes any
-  codepoint above 255 — e.g. the "•" bullet in `list_projects` output or an
-  accented project name — into the *literal* text `\\x{2022}`, which is not a
-  valid JSON escape, so the MCP client rejects the entire message and every
-  tool call times out. The fix is `IO.binwrite/2`, which emits the already-UTF-8
-  `Jason.encode!/1` bytes verbatim regardless of the device encoding.
+  Two bugs bit here, both from the stdio device's encoding mode:
 
-  This test drives `Server.handle_info/2` directly (so it runs in the test
-  process and its writes land in the captured device) under a **latin1**
-  capture, exactly reproducing the production condition.
+  1. **Output escapes** — under `-noshell`, `IO.puts/2` on a latin1 device
+     escapes any codepoint above 255 (the "•" bullet became the literal text
+     `\\x{2022}`), which is not a valid JSON escape and makes clients reject
+     the message. The intermediate `IO.binwrite/2` fix swapped the failure
+     mode: on a *unicode*-mode device it re-encoded each byte as its own
+     codepoint (the "→" arrow came out as "â"). The final fix pins the device
+     to UTF-8 via `StdioEncoding.ensure_utf8/0` and writes with
+     encoding-aware `IO.write/2`, which is byte-clean on either starting mode.
+
+  2. **Input mangling** — on a *unicode*-mode device, `IO.binread/2` asks the
+     io server for a latin1 reply: it decodes the incoming UTF-8 and re-encodes
+     each codepoint as one latin1 byte (ç → 0xE7; "●" has no latin1 form at
+     all), so `Jason.decode` rejected every request carrying non-ASCII with a
+     bare "Parse error" — silently, since the parse-error response has
+     `id: null` and clients keyed on request ids. Fixed by reading with
+     encoding-aware `IO.read/2` after pinning the device to UTF-8.
+
+  Both tests capture through ExUnit's io device: the output test runs under a
+  UTF-8 capture — the state production reaches right after `ensure_utf8/0`
+  pins the device — and the input test starts from a latin1 capture and
+  asserts `StdinReader.loop/1` still hands back the "●" payload intact.
   """
   use ExUnit.Case, async: false
 
   import ExUnit.CaptureIO
 
   alias CapcutMcp.CapCut.ProjectStore
-  alias CapcutMcp.MCP.Server
+  alias CapcutMcp.MCP.{Server, StdinReader}
 
   setup %{tmp_dir: tmp} do
     project_id = "ENC-TEST-1"
@@ -63,18 +75,18 @@ defmodule CapcutMcp.MCP.ServerEncodingTest do
   end
 
   @tag :tmp_dir
-  test "a non-ASCII tool response is valid JSON on a latin1 stdio device" do
+  test "a non-ASCII tool response is valid JSON on the UTF-8-pinned stdio device" do
     request =
       ~s({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"list_projects","arguments":{}}})
 
     output =
-      capture_io([encoding: :latin1], fn ->
+      capture_io([encoding: :utf8], fn ->
         assert {:noreply, _} = Server.handle_info({:line, request}, %{})
       end)
 
     # The literal broken-escape sequence must NOT appear...
     refute output =~ "\\x{",
-           "response leaked an Elixir codepoint escape — reverted to IO.puts on a latin1 device?"
+           "response leaked an Elixir codepoint escape — encoding-aware write bypassed?"
 
     # ...and the emitted bytes must parse as JSON and round-trip the real chars.
     decoded = output |> String.trim() |> Jason.decode!()
@@ -82,5 +94,23 @@ defmodule CapcutMcp.MCP.ServerEncodingTest do
 
     assert text =~ "•"
     assert text =~ "Café"
+  end
+
+  @tag :tmp_dir
+  test "StdinReader forwards a UTF-8 request line intact on a latin1 stdio device" do
+    request =
+      ~s({"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"add_text","arguments":{"content":"●"}}})
+
+    output =
+      capture_io([encoding: :latin1, input: request <> "\n"], fn ->
+        parent = self()
+        spawn(fn -> StdinReader.loop(parent) end)
+
+        assert_receive {:line, trimmed}, 2_000
+        assert trimmed == String.trim(request)
+      end)
+
+    # The loop must not have written anything to stdout while reading.
+    assert output == ""
   end
 end

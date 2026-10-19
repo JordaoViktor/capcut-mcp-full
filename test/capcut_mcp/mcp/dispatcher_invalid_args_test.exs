@@ -19,8 +19,8 @@ defmodule CapcutMcp.MCP.DispatcherInvalidArgsTest do
 
   @tool_names ~w(
     add_clip add_text create_project get_project get_timeline list_projects
-    move_clip read_draft_json remove_clip set_clip_blend_mode set_clip_loop
-    set_clip_opacity set_clip_transform set_clip_volume trim_clip
+    move_clip read_draft_json remove_clip render_project set_clip_blend_mode
+    set_clip_loop set_clip_opacity set_clip_transform set_clip_volume trim_clip
   )
 
   setup %{tmp_dir: tmp} do

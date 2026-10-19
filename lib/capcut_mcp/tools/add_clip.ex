@@ -7,19 +7,24 @@ defmodule CapcutMcp.Tools.AddClip do
 
   @video_exts ~w(.mp4 .mov .avi .mkv .webm .m4v .wmv)
   @audio_exts ~w(.mp3 .wav .aac .flac .ogg .m4a)
+  # Images render as full-layer media (logos/watermarks) — the Remotion
+  # renderer already treats non-video/non-audio materials as `image` layers
+  # via extension (model.mjs materialKind/2).
+  @image_exts ~w(.png .jpg .jpeg .webp)
 
   @impl true
   def definition do
     %{
       "name" => "add_clip",
-      "description" => "Adds a video or audio file as a clip to a CapCut project timeline.",
+      "description" =>
+        "Adds a video, audio, or image file as a clip to a CapCut project timeline.",
       "inputSchema" => %{
         "type" => "object",
         "properties" => %{
           "project_id" => %{"type" => "string", "description" => "The draft_id of the project"},
           "file_path" => %{
             "type" => "string",
-            "description" => "Absolute path to the video or audio file"
+            "description" => "Absolute path to the video, audio, or image file"
           },
           "start_ms" => %{
             "type" => "integer",
@@ -67,10 +72,15 @@ defmodule CapcutMcp.Tools.AddClip do
 
       segment = build_segment(segment_id, material_id, validated_start_ms, validated_duration_ms)
 
-      {updated_tracks, track_idx} =
-        TimelineHelper.insert_segment(tracks, segment, track_type, validated_track_index)
+      # Images live on a video track (CapCut convention: photo segments ride
+      # video tracks with a `photo` material type).
+      track_kind = if track_type == "audio", do: "audio", else: "video"
 
-      material_key = if track_type == "video", do: "videos", else: "audios"
+      {updated_tracks, track_idx} =
+        TimelineHelper.insert_segment(tracks, segment, track_kind, validated_track_index)
+
+      material_key =
+        if track_type in ["video", "image"], do: "videos", else: "audios"
 
       updated_draft =
         draft
@@ -82,14 +92,16 @@ defmodule CapcutMcp.Tools.AddClip do
   end
 
   defp build_material(id, track_type, file_path, duration_ms) do
+    type = if track_type == "image", do: "photo", else: track_type
+
     %{
       "id" => id,
-      "type" => track_type,
+      "type" => type,
       "path" => Path.expand(file_path),
       "duration" => duration_ms * 1000,
       "item_source" => 1,
       "md5" => "",
-      "metetype" => track_type
+      "metetype" => type
     }
   end
 
@@ -141,11 +153,14 @@ defmodule CapcutMcp.Tools.AddClip do
       ext in @video_exts ->
         {:ok, "video"}
 
+      ext in @image_exts ->
+        {:ok, "image"}
+
       ext in @audio_exts ->
         {:ok, "audio"}
 
       true ->
-        supported = Enum.join(@video_exts ++ @audio_exts, ", ")
+        supported = Enum.join(@video_exts ++ @image_exts ++ @audio_exts, ", ")
 
         {:error,
          "Unsupported file extension #{inspect(ext)} for #{path}. Supported: #{supported}"}

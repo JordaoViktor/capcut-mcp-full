@@ -29,6 +29,7 @@ defmodule CapcutMcp.CapCut.TextAnimations do
 
   @type entry :: %{
           name: String.t(),
+          display_name: String.t(),
           effect_id: String.t(),
           resource_id: String.t(),
           type: animation_type(),

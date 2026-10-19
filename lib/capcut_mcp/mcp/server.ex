@@ -7,7 +7,7 @@ defmodule CapcutMcp.MCP.Server do
   """
   use GenServer
   require Logger
-  alias CapcutMcp.MCP.{Dispatcher, Protocol}
+  alias CapcutMcp.MCP.{Dispatcher, Protocol, StdioEncoding}
 
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
@@ -15,6 +15,7 @@ defmodule CapcutMcp.MCP.Server do
 
   @impl true
   def init(_opts) do
+    StdioEncoding.ensure_utf8()
     Logger.info("CapCut MCP Server started — waiting for messages on stdin")
     {:ok, %{}}
   end
@@ -34,18 +35,6 @@ defmodule CapcutMcp.MCP.Server do
     {:noreply, state}
   end
 
-  # Write the JSON-RPC response as raw UTF-8 bytes. MUST be `binwrite`, not
-  # `IO.puts`: under `-noshell` (both `mix run` and the release) stdio defaults
-  # to latin1, and `IO.puts` on a latin1 device escapes any non-latin1 codepoint
-  # — e.g. the "•" bullet or an accented project name — into the literal text
-  # `\x{2022}`, which is not a valid JSON escape and makes the client reject the
-  # whole message ("Bad escaped character in JSON"). `Jason.encode!/1` already
-  # returns a proper UTF-8 binary; `binwrite` emits those bytes verbatim,
-  # bypassing the device's character encoding entirely.
-  defp write_line(iodata) do
-    IO.binwrite(:stdio, [iodata, ?\n])
-  end
-
   def handle_info(:eof, state) do
     Logger.info("stdin closed — shutting down")
     # The MCP client closed stdin, which is its signal to shut down. Stop
@@ -62,6 +51,17 @@ defmodule CapcutMcp.MCP.Server do
   def handle_info({:stdin_error, reason}, state) do
     Logger.error("stdin error: #{inspect(reason)}")
     {:stop, reason, state}
+  end
+
+  # Write the JSON-RPC response through encoding-aware `IO.write` with stdio
+  # pinned to UTF-8 (`StdioEncoding.ensure_utf8/0`). The earlier `IO.binwrite`
+  # asked the io server for latin1 semantics: on a unicode-mode device every
+  # non-ASCII byte got re-encoded as its own codepoint (the "→" arrow in tool
+  # results came out as the lone bytes of "â"). `IO.write` encodes the
+  # codepoints to the device's UTF-8 encoding, so clients receive clean UTF-8.
+  defp write_line(iodata) do
+    StdioEncoding.ensure_utf8()
+    IO.write(:stdio, [iodata, ?\n])
   end
 
   # Tag every log emitted downstream with the MCP request id + method so we can

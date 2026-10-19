@@ -1,0 +1,129 @@
+{
+  "assinatura": {
+    "cartelas": "fundo vinho/grafite e texto champanhe; sem gradientes neon",
+    "distribuicao": "fundos 60-75% escuros/neutros, texto 20-30% champanhe/off-white, dourado 5-10% de acentos",
+    "estetica": "editorial imobiliario premium, respirado, natural, ritmo contemplativo",
+    "imagem": "fotos/renders aprovados THC; IA apenas conceitual/ilustrativa; nunca insinuar detalhes construtivos inexistentes",
+    "layout": "alinhamento preferencial a esquerda, espaco negativo, linhas finas, cantos discretos",
+    "motion": "pan suave, dolly-in lento, parallax discreto, fade/cut limpo, transicoes de 8-14 quadros",
+    "proibido": [
+      "glitch",
+      "zoom agressivo",
+      "flashes",
+      "neon",
+      "tipografia gamificada",
+      "stickers infantis"
+    ]
+  },
+  "ativos_verificados": {
+    "aura": {
+      "academia": "https://thcempreendimentos.com.br/wp-content/uploads/2026/06/592-592-3.png",
+      "fachada": "https://thcempreendimentos.com.br/wp-content/uploads/2026/06/592-592-2.png",
+      "interior": "https://thcempreendimentos.com.br/wp-content/uploads/2026/06/592-592-5.png",
+      "piscina": "https://thcempreendimentos.com.br/wp-content/uploads/2026/06/592-592-4.png"
+    },
+    "institucional": {
+      "montagem_obra": "https://thcempreendimentos.com.br/wp-content/uploads/2024/07/Group-2.png",
+      "rosani_brange": "https://thcempreendimentos.com.br/wp-content/uploads/2024/08/thc-sobre-rosani.jpg"
+    },
+    "majestic_view": {
+      "fachada": "https://thcempreendimentos.com.br/wp-content/uploads/2024/07/Rectangle-4.png",
+      "interior": "https://thcempreendimentos.com.br/wp-content/uploads/2024/07/Rectangle-14.png",
+      "piscina": "https://thcempreendimentos.com.br/wp-content/uploads/2024/07/Rectangle-12-3.png",
+      "quadra": "https://thcempreendimentos.com.br/wp-content/uploads/2024/07/Rectangle-13-2.png"
+    }
+  },
+  "empresa": {
+    "empreendimentos": [
+      "Aura Residence",
+      "Majestic View"
+    ],
+    "nome": "THC Empreendimentos",
+    "pessoa_institucional": "Rosani Brange (CEO) — nao usar imagem/fala atribuida sem autorizacao especifica",
+    "segmento": "imobiliario premium — editorial, arquitetura como protagonista"
+  },
+  "homologacao": {
+    "checklist": "ver DESIGN_SYSTEM.md secao 8 — substituir status estimated por approved apos validacao",
+    "pendencias": [
+      "vetor oficial do logo (.svg/.ai/PDF) com variacoes",
+      "paleta oficial HEX/RGB/CMYK com responsavel de design",
+      "familias/pesos/licencas das fontes institucionais",
+      "identidade separada dos empreendimentos (Aura/Majestic)"
+    ]
+  },
+  "logo": {
+    "aplicacao": "claro, com contraste sobre vinho/escuro ou area protegida do video; preservar proporcoes e desenho",
+    "caminho": "~/.config/capcut-mcp/brand-assets/logo-thc.png",
+    "dimensoes": "131x64 RGBA",
+    "url_oficial": "https://thcempreendimentos.com.br/wp-content/uploads/2023/03/logo.png"
+  },
+  "paleta": {
+    "champagne": "#F6DDAE",
+    "destaque": "#E2A34B",
+    "dim_brightness": -0.45,
+    "gold": "#E2A34B",
+    "ink": "#211D1B",
+    "ivory": "#F8F5EE",
+    "primaria": "#4D1512",
+    "stone": "#B9B0A5",
+    "texto": "#F6DDAE",
+    "wine": "#4D1512"
+  },
+  "regras_agente": {
+    "faca": [
+      "carregar estes tokens como configuracao PROVISORIA (status: estimated)",
+      "preservar logos e proporcoes; usar arquivos oficiais de marca",
+      "diferenciar THC institucional, Aura e Majestic por conteudo/ativos",
+      "priorizar legibilidade, contraste e consistencia entre proporcoes",
+      "apresentar preview e aguardar aprovacao antes do lote de pecas",
+      "indicar dados nao verificados e pedir confirmacao antes de anunciar"
+    ],
+    "nao_faca": [
+      "nao apresentar as fontes substitutas como a familia oficial da THC",
+      "nao apresentar HEX provisorio como codigo oficial da marca",
+      "nao alterar ou redesenhar a marca com IA",
+      "nao misturar renders de um empreendimento com textos sobre o outro",
+      "nao usar glitch, zoom agressivo, flashes, neon ou tipografia gamificada como padrao",
+      "nao inventar praia privativa, vista garantida, mobilia entregue ou areas nao anunciadas"
+    ]
+  },
+  "status": "estimated",
+  "tipografia": {
+    "alternativas_corpo": [
+      "Manrope",
+      "Inter"
+    ],
+    "alternativas_display": [
+      "Playfair Display",
+      "Libre Baskerville"
+    ],
+    "corpo": "Montserrat",
+    "display": "Cormorant Garamond",
+    "estilos_video_1080x1920_px": {
+      "cta": [
+        34,
+        42
+      ],
+      "eyebrow_localizacao": [
+        24,
+        30
+      ],
+      "headline": [
+        72,
+        104
+      ],
+      "legendas": [
+        42,
+        54
+      ],
+      "subheadline": [
+        34,
+        46
+      ]
+    },
+    "padrao": 2.5,
+    "padrao_ref": "2.5% da altura = ~48px em 1080x1920 (faixa de legendas acessiveis)",
+    "regra_logo": "usar a imagem oficial do logo; nunca redesenhar THC com fonte substituta",
+    "status": "substitutas NAO oficiais — homologar com manual de marca"
+  }
+}

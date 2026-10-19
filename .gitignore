@@ -38,3 +38,8 @@ capcut_mcp-*.tar
 /.cursor/
 /.claude/
 .cursorrules
+
+# Local secrets
+.env
+runway-mcp/.env
+/epidemic-sound-output/

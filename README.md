@@ -12,9 +12,11 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server for C
 
 Built just for fun in a "crazy" language. Elixir/OTP with GenServers, supervision trees, pattern matching and pipes everywhere.
 
+**Guia para o time de marketing:** [docs/GUIA-MARKETING.md](docs/GUIA-MARKETING.md) — referência de todas as ferramentas, receitas prontas, custos dos modelos de IA e solução de problemas, em português.
+
 ## What it does
 
-Claude gets 19 tools to work with your CapCut projects:
+Claude gets 30 tools to work with your CapCut projects:
 
 **Read & Inspect**
 
@@ -31,8 +33,11 @@ Claude gets 19 tools to work with your CapCut projects:
 |------|--------------------|
 | `create_project` | Create a new empty draft (custom size/FPS) -- writes CapCut's full companion-file scaffold and the timeline/project id split so it actually opens, not just lists |
 | `remove_project` | Delete a draft (manifest entry + on-disk folder) |
-| `add_text` | Add a text overlay at a specific time |
-| `add_clip` | Add a video or audio file to the timeline (validates file exists) |
+| `add_text` | Add a text overlay at a specific time -- font_size is a percentage of canvas height (real drafts use ~8), plus color, stroke, and position_y (vertical placement); `use_brand: true` pulls palette/typography defaults from the brand memory |
+| `add_clip` | Add a video, audio, or image file to the timeline (validates file exists; images render as photo layers — logos/watermarks) |
+| `get_brand` | Read the brand identity memory: global palette/typography/company info plus the project's pending off-palette styles |
+| `set_brand` | Write the global brand (the explicit entry point; merge or replace) |
+| `promote_style` | Promote a project's pending styles into the global brand (opt-in; colors get roles like `paleta.acento`) |
 
 **Modify Clips**
 
@@ -55,6 +60,36 @@ Claude gets 19 tools to work with your CapCut projects:
 | `add_text_animation` | Apply a fade/slide/blur/typewriter intro or outro animation to a text clip |
 | `list_text_animations` | List the available animation names |
 
+**Export & Render**
+
+| Tool | What Claude can do |
+|------|--------------------|
+| `render_project` | Render a draft to a video file (MP4/WebM/MOV) via the bundled Remotion renderer |
+
+**Voice (ElevenLabs + Gemini)**
+
+| Tool | What Claude can do |
+|------|--------------------|
+| `voice_command` | Process a recorded voice command (audio file): Gemini transcribes it, maps the spoken instruction to editing tool calls and executes them. With `project_id` set, the current timeline is included as context, so "mute the music" resolves to the real clip id |
+| `generate_speech` | Generate voiceover/narration from text with ElevenLabs TTS and optionally add the MP3 to the timeline |
+| `list_voices` | List the ElevenLabs voices on your account (ids + names) |
+| `transcribe_audio` | Transcribe any audio/video file (up to ~15MB) with Gemini — captions, summaries, or "what does this clip say" |
+
+**Music & Sound Effects (Epidemic Sound)**
+
+The official remote MCP is configured separately as `epidemic-sound` in Codex,
+using OAuth. It handles catalog discovery and asset downloads; save the returned
+file locally and use CapCut's `add_clip` to insert it. See the
+[official MCP setup](docs/EPIDEMIC-SOUND.md#mcp-oficial-configurado-no-codex).
+
+The following built-in tools are an alternative using a Partner API key:
+
+- `search_epidemic_sound`: search music or sound effects; filter music to instrumental with `vocal_type: "NONE"`.
+- `download_epidemic_sound`: download a selected asset as MP3 and optionally insert it into a project's timeline.
+- `report_epidemic_sound_export`: report a completed video export containing music to Epidemic Sound.
+
+Setup and examples: [Epidemic Sound integration](docs/EPIDEMIC-SOUND.md).
+
 Example prompts once connected:
 - "List my CapCut projects"
 - "Add the text 'Intro' to project X at 0ms for 3 seconds"
@@ -65,6 +100,26 @@ Example prompts once connected:
 - "Mute the video on track 2 and loop the mascot clip"
 - "Add a fade-in to the title text, and a fade-out for the last half second"
 - "Animate the logo sliding up into position over the first 500ms"
+- "Render project X to an MP4"
+- "Generate a voiceover saying 'chega de desculpas' with Rachel and add it at 2s"
+- "Process the voice command at ~/Downloads/cmd.m4a for project X" (speaks → edits)
+- "Transcribe ~/Videos/take-1.mp4"
+- "Find instrumental upbeat music on Epidemic Sound for this product video"
+- "Download that Epidemic Sound track and add the first 15 seconds to project X"
+- "Find a short whoosh sound effect on Epidemic Sound and add it at 2 seconds"
+- "Generate a 9:16 clip of the product rotating on a white table and add it to project X"
+
+### The voice loop for marketing teams
+
+`voice_command` closes the loop talk → edit → confirmation:
+
+1. Anyone on the team records an instruction (QuickTime on macOS, the phone's recorder, anything that saves mp3/m4a/wav/ogg/webm/mp4).
+2. Tell Claude: *"Process the voice command at /path/to/recording.m4a for project X"* (or call `voice_command` directly).
+3. Gemini transcribes the recording, resolves spoken references against the project's actual timeline (segment ids, file names, timings) and returns a plan of tool calls.
+4. Each action is executed by the same dispatcher — `add_text`, `set_clip_volume`, `trim_clip`, `generate_speech`, `render_project`, … (up to 10 actions per command; `remove_project` is never auto-executed).
+5. The result includes the verbatim transcript, the executed actions with their outcomes, and a short natural-language reply — optionally spoken back as an MP3 with `speak_reply: true`.
+
+Set `execute: false` to preview the plan without touching the timeline — useful for reviewing what the team asked before applying it.
 
 ## Requirements
 
@@ -72,6 +127,9 @@ Example prompts once connected:
 - [Erlang/OTP 28](https://www.erlang.org/downloads) installed
 - Elixir 1.19+ (see [Installation](#installation))
 - CapCut desktop app installed
+- **For `render_project` only:** [Node.js](https://nodejs.org) 18+ on `PATH`, and one-time `npm install` inside the repo's `renderer/` directory (the render server boots ~40MB of npm dependencies; if they're missing, the tool says so and suggests the exact command)
+- **For the voice tools only:** `ELEVENLABS_API_KEY` (ElevenLabs TTS — [get one here](https://elevenlabs.io)) and `GEMINI_API_KEY` (Gemini transcription/command interpretation — [get one here](https://aistudio.google.com/apikey)). Both are optional; every other tool works without them, and each voice tool tells you exactly which key is missing.
+- **For video generation:** the companion **Runway MCP** in [`runway-mcp/`](runway-mcp/) with `RUNWAYML_API_SECRET` ([get one here](https://dev.runwayml.com)). Generation is intentionally not part of this server; the Runway MCP returns a local MP4 path that you add with `add_clip`.
 
 ## Installation
 
@@ -256,15 +314,95 @@ CAPCUT_APPS_PATH="/Users/<you>/Applications/CapCut.app/Contents/Resources" mix r
 
 `set_clip_blend_mode` is the only tool that needs this; everything else (including `create_project`) works without it.
 
+## Voice (ElevenLabs + Gemini)
+
+The voice tools need API keys as environment variables before starting the server.
+
+| Variable | Provider | Used by | Default when unset |
+|----------|----------|---------|--------------------|
+| `ELEVENLABS_API_KEY` | ElevenLabs | `generate_speech`, `list_voices`, the `speak_reply` option of `voice_command` | tools return a descriptive error |
+| `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) | Google Gemini | `transcribe_audio`, `voice_command` | tools return a descriptive error |
+| `ELEVENLABS_VOICE_ID` | ElevenLabs | default voice for `generate_speech` | Rachel (`21m00Tcm4TlvDq8ikWAM`) |
+| `ELEVENLABS_MODEL_ID` | ElevenLabs | TTS model | `eleven_multilingual_v2` |
+| `GEMINI_TEXT_MODEL` | Gemini | transcription + command interpretation | `gemini-2.5-flash` |
+| `VOICE_OUTPUT_DIR` | — | where generated media lands when no project is bound | `./voice-output` |
+
+```bash
+ELEVENLABS_API_KEY="sk_..." GEMINI_API_KEY="AIza..." mix run --no-halt
+```
+
+Notes:
+
+- **Keys are read at boot** (via `runtime.exs`) and can also be pinned through application env (`:elevenlabs_api_key`, `:gemini_api_key`) for tests/embedding.
+- **Command interpretation is prompt-scoped**: `voice_command` injects the exact tool catalog and the project's timeline into the Gemini prompt and validates the returned plan against an allowlist before executing anything. Unknown tools are dropped and reported; destructive tools (`remove_project`) are never auto-executed.
+- **Generated media placement**: with `project_id`, TTS audio goes to `<project>/voice/`; without a project, to `VOICE_OUTPUT_DIR`.
+- **Video generation is separate**: use the Runway MCP (`runway-mcp/server.mjs`), then pass the absolute MP4 path to `add_clip`. The CapCut server does not call any video provider.
+
+## Video generation (Runway MCP)
+
+Video generation lives in the standalone MCP server at `runway-mcp/` (zero dependencies, Node 18+). It talks to the Runway API, polls the task, downloads the MP4 and returns its absolute path — then you add it to CapCut with `add_clip`.
+
+```bash
+# runway-mcp/.env (or the repo .env)
+RUNWAYML_API_SECRET="key_..."
+# optional
+RUNWAY_VIDEO_MODEL="gen4.5"
+RUNWAY_OUTPUT_DIR="$HOME/Movies/runway"
+```
+
+Register it in your MCP client (`~/.config/opencode/opencode.json`):
+
+```json
+"runway": {
+  "type": "local",
+  "command": ["node", "/absolute/path/to/runway-mcp/server.mjs"],
+  "enabled": true
+}
+```
+
+Tools: `generate_video` (text-to-video, or image-to-video with `image`), `get_task`, `cancel_task`, `list_models`.
+
+## Export & Render
+
+`render_project` turns a draft into a real video file — the thing CapCut itself can only do through its UI. It shells out to a **bundled Remotion renderer** (a self-contained Node project in `renderer/`): the server converts the draft JSON into a timeline model, and Remotion's headless Chrome draws every frame and muxes it with ffmpeg.
+
+```bash
+# One-time setup (the tool reports this exact command when deps are missing)
+cd renderer && npm install
+```
+
+Then, from Claude: *"Render project X to an MP4"* — or directly:
+
+```json
+{"name": "render_project", "arguments": {"project_id": "<draft_id>"}}
+```
+
+Arguments:
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `project_id` | required | The draft_id (from `list_projects`) |
+| `output_path` | `<project>/renders/render-<timestamp>.mp4` | Where to write the video (extension must match the codec) |
+| `codec` | `h264` | `h264`, `h265`, `vp8`, `vp9`, or `prores` (container: mp4/mov/mkv, webm, mov/mkv) |
+| `concurrency` | auto | Remotion render concurrency (browser tabs) |
+
+Renders are synchronous (the tool call blocks until the file is done) with a 15-minute safety timeout — configurable via `Application.get_env(:capcut_mcp, :remotion_render_timeout_ms)`. The renderer directory is resolved from `REMOTION_RENDERER_PATH` (env var or application env `:remotion_renderer_path`), falling back to a `renderer/` folder in the current directory or any parent; a missing `node` binary or missing `node_modules` produces a specific, actionable error.
+
+**What renders faithfully:** clips (video/image/audio) with their trim in/out points, position, scale, flip, rotation, opacity, volume and loop; text overlays (content, size, color, alignment); transforms; per-frame keyframe curves (position, scale, rotation, opacity, saturation, contrast, brightness, volume); blend modes (Screen, Multiply, Soft Light, Overlay, ...); and the curated text animations (fade/slide/blur/typewriter, intro and outro).
+
+**What does not render (yet):** transitions, visual effects, stickers, filters, and masks — the tool reports them as skipped layers in its summary instead of failing.
+
 ## Architecture
 
 ```text
 Claude (stdin/stdout JSON-RPC 2.0)
   └── MCP.Server          GenServer -- stdin loop, dispatches messages
         └── MCP.Dispatcher  Pure -- routes tool calls by name
-              └── Tools.*       Pure -- one module per tool (15 tools)
+              └── Tools.*       Pure -- one module per tool (28 tools)
                     ├── TimelineHelper   Shared -- segment lookup, validation, UUID
                     ├── BlendModes       ETS-cached -- discovers CapCut MixMode resources
+                    ├── TextAnimations   Pure -- curated intro/outro animation catalog
+                    ├── Remotion.Renderer Pure -- shells out to Node/Remotion for render_project
                     └── ProjectStore     GenServer -- project cache + disk I/O
                           ├── PathDiscovery  Pure -- resolves projects root (env / LOCALAPPDATA)
                           ├── Reader         Pure -- reads JSON files
@@ -358,7 +496,7 @@ iex -S mix run --no-halt
 
 ## Known Limitations
 
-- **Export/render** -- not possible via this server (CapCut has no CLI for export; only UI automation could do it)
+- **Render is an approximation** -- `render_project` draws the timeline with Remotion, not through CapCut's own engine, so fonts may fall back and unsupported layer kinds (transitions, effects, stickers, filters) are skipped and reported. See [Export & Render](#export--render)
 - **Cloud projects** -- only local drafts are accessible
 - **Effects and templates** -- can reference CapCut's built-in effect IDs but can't create new ones; the exact IDs vary by CapCut version
 - **CapCut format changes** -- CapCut updates may change the JSON schema; tested against v8.3.0
@@ -366,11 +504,12 @@ iex -S mix run --no-halt
 ## Tech Stack
 
 - **Elixir 1.19 / OTP 28** -- because why not
+- **Remotion + React** (`renderer/`) -- headless-Chrome frame-by-frame video rendering for `render_project`
 - **Jason** -- JSON encode/decode
 - **:telemetry** -- structured events for every tool call
 - **Credo** (`--strict`) -- zero issues
 - **Dialyzer** (`:underspecs`, `:error_handling`, `:unknown`) -- zero warnings
-- **ExUnit** -- 237 tests + 15 `stream_data` property tests + 8 doctests (incl. JSON-RPC integration tests with telemetry assertions on tools + cache + blend-modes + schema-version + meta-rejected events, path-discovery fallbacks for both Windows and macOS, a boundary fuzz test that hammers every registered tool with random `StreamData.term()` arguments, timeline-mutation invariants like `update_segment` roundtrip, `ensure_timerange` idempotency and `insert_segment` count preservation, and a latin1-stdio regression test locking in the binary-transport fix)
+- **ExUnit** -- 264 tests + 15 `stream_data` property tests + 8 doctests (incl. JSON-RPC integration tests with telemetry assertions on tools + cache + blend-modes + schema-version + meta-rejected events, path-discovery fallbacks for both Windows and macOS, a boundary fuzz test that hammers every registered tool with random `StreamData.term()` arguments, timeline-mutation invariants like `update_segment` roundtrip, `ensure_timerange` idempotency and `insert_segment` count preservation, and a latin1-stdio regression test locking in the binary-transport fix)
 - **StreamData** -- property-based tests for `TimelineHelper` (UUID format, segment roundtrip, track insertion invariants, `validate_timing` domain) and for the `tools/call` request boundary (no random payload may crash the dispatcher)
 - **ExCoveralls** -- coverage report on application code (remaining gaps are the stdin-loop I/O layer and a few lazy disk helpers)
 

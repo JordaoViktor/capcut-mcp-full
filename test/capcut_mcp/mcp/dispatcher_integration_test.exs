@@ -118,7 +118,7 @@ defmodule CapcutMcp.MCP.DispatcherIntegrationTest do
     response = dispatch(msg)
 
     assert %{"result" => %{"tools" => tools}} = response
-    assert length(tools) == 19
+    assert length(tools) == 30
     assert Enum.all?(tools, &is_map(&1["inputSchema"]))
     assert Enum.all?(tools, &is_binary(&1["name"]))
 
@@ -128,7 +128,12 @@ defmodule CapcutMcp.MCP.DispatcherIntegrationTest do
     assert "remove_project" in names
     assert "add_text_animation" in names
     assert "set_clip_keyframe" in names
+    assert "generate_speech" in names
+    assert "list_voices" in names
+    assert "transcribe_audio" in names
+    assert "voice_command" in names
     assert "list_text_animations" in names
+    assert "render_project" in names
   end
 
   @tag :tmp_dir

@@ -10,6 +10,12 @@
 DIR="$(cd "$(dirname "$0")" && pwd)"
 BIN="$DIR/_build/prod/rel/capcut_mcp/bin/capcut_mcp"
 
+if [ -f "$DIR/.env" ]; then
+  set -a
+  . "$DIR/.env"
+  set +a
+fi
+
 if [ ! -x "$BIN" ]; then
   echo "capcut-mcp: release not built. Run:  MIX_ENV=prod mix release --overwrite" >&2
   echo "capcut-mcp: (looked for $BIN)" >&2

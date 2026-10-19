@@ -1,6 +1,5 @@
 defmodule CapcutMcp.MCP.Dispatcher do
   @moduledoc "Routes JSON-RPC tool calls to the appropriate tool module."
-  require Logger
   alias CapcutMcp.MCP.Protocol
 
   alias CapcutMcp.Tools.{
@@ -8,21 +7,32 @@ defmodule CapcutMcp.MCP.Dispatcher do
     AddText,
     AddTextAnimation,
     CreateProject,
+    DownloadEpidemicSound,
+    GenerateSpeech,
+    GetBrand,
     GetProject,
     GetTimeline,
     ListProjects,
     ListTextAnimations,
+    ListVoices,
     MoveClip,
+    PromoteStyle,
     ReadDraftJson,
     RemoveClip,
     RemoveProject,
+    RenderProject,
+    ReportEpidemicSoundExport,
+    SearchEpidemicSound,
+    SetBrand,
     SetClipBlendMode,
     SetClipKeyframe,
     SetClipLoop,
     SetClipOpacity,
     SetClipTransform,
     SetClipVolume,
-    TrimClip
+    TranscribeAudio,
+    TrimClip,
+    VoiceCommand
   }
 
   @tools [
@@ -30,21 +40,32 @@ defmodule CapcutMcp.MCP.Dispatcher do
     AddText,
     AddTextAnimation,
     CreateProject,
+    DownloadEpidemicSound,
+    GenerateSpeech,
+    GetBrand,
     GetProject,
     GetTimeline,
     ListProjects,
     ListTextAnimations,
+    ListVoices,
     MoveClip,
+    PromoteStyle,
     ReadDraftJson,
     RemoveClip,
     RemoveProject,
+    RenderProject,
+    ReportEpidemicSoundExport,
+    SearchEpidemicSound,
+    SetBrand,
     SetClipBlendMode,
     SetClipKeyframe,
     SetClipLoop,
     SetClipOpacity,
     SetClipTransform,
     SetClipVolume,
-    TrimClip
+    TranscribeAudio,
+    TrimClip,
+    VoiceCommand
   ]
 
   @tool_definitions Enum.map(@tools, & &1.definition())
@@ -127,6 +148,14 @@ defmodule CapcutMcp.MCP.Dispatcher do
       tool.execute(args)
     end
   end
+
+  @doc """
+  Executes a tool by name with the same validation as `tools/call`, for
+  internal orchestration (e.g. `voice_command` running its action plan).
+  Returns `{:ok, text}` or `{:error, reason}` like the tool modules do.
+  """
+  @spec call_tool(String.t(), map()) :: {:ok, String.t()} | {:error, term()}
+  def call_tool(name, args), do: run_tool(name, args)
 
   defp fetch_tool(name) do
     case Map.fetch(@tool_by_name, name) do

@@ -337,6 +337,103 @@ defmodule CapcutMcp.ToolsTest do
     assert length(text_track["segments"]) == 1
   end
 
+  @tag :tmp_dir
+  test "AddText writes CapCut-style JSON content with real-draft ground truth defaults", %{
+    project_id: id
+  } do
+    assert {:ok, _} =
+             AddText.execute(%{
+               "project_id" => id,
+               "content" => "Hello World",
+               "start_ms" => 0,
+               "duration_ms" => 2000
+             })
+
+    {:ok, draft} = ProjectStore.get_project(id)
+    material = List.last(draft["materials"]["texts"])
+
+    # Real drafts (video-obra-legendado) carry the render size inside
+    # content JSON styles[0].size as a percentage of canvas height, while
+    # text_size stays at CapCut's constant legacy 30.
+    assert %{"styles" => [style], "text" => "Hello World"} = Jason.decode!(material["content"])
+    assert style["size"] == 8.0
+    assert style["range"] == [0, 11]
+    assert style["fill"]["content"]["solid"]["color"] == [1.0, 1.0, 1.0]
+    assert material["font_size"] == 8.0
+    assert material["text_size"] == 30
+    assert material["text_color"] == "#FFFFFF"
+    assert material["font_color"] == "rgba(1,1,1,1)"
+  end
+
+  @tag :tmp_dir
+  test "AddText honors font_size, color, stroke and position_y", %{project_id: id} do
+    assert {:ok, _} =
+             AddText.execute(%{
+               "project_id" => id,
+               "content" => "Título",
+               "start_ms" => 500,
+               "duration_ms" => 3000,
+               "font_size" => 9,
+               "color" => "#ff8800",
+               "stroke_color" => "#000000",
+               "stroke_width" => 0.2,
+               "position_y" => -0.82
+             })
+
+    {:ok, draft} = ProjectStore.get_project(id)
+    material = List.last(draft["materials"]["texts"])
+    segment = List.last(hd(Enum.filter(draft["tracks"], &(&1["type"] == "text")))["segments"])
+
+    style = Jason.decode!(material["content"]) |> Map.fetch!("styles") |> List.first()
+    assert style["size"] == 9.0
+    assert style["range"] == [0, 6]
+    assert style["fill"]["content"]["solid"]["color"] == [1.0, 136 / 255, 0.0]
+
+    assert style["strokes"] == [
+             %{
+               "content" => %{"solid" => %{"alpha" => 1.0, "color" => [0.0, 0.0, 0.0]}},
+               "width" => 0.2
+             }
+           ]
+
+    assert material["font_size"] == 9.0
+    assert material["text_color"] == "#FF8800"
+    assert material["font_color"] == "rgba(1,0.5333333333333333,0,1)"
+    assert segment["clip"]["transform"] == %{"x" => 0.0, "y" => -0.82}
+  end
+
+  @tag :tmp_dir
+  test "AddText rejects invalid font_size, colors, stroke_width and position_y", %{project_id: id} do
+    base = %{"project_id" => id, "content" => "x", "start_ms" => 0, "duration_ms" => 1000}
+
+    for {key, value, msg} <- [
+          {"font_size", 0.1, "Invalid font_size"},
+          {"font_size", 101, "Invalid font_size"},
+          {"font_size", "big", "Invalid font_size"},
+          {"color", "white", "Invalid color"},
+          {"stroke_color", "#12345", "Invalid stroke_color"},
+          {"stroke_width", 5.0, "Invalid stroke_width"},
+          {"position_y", 2.5, "Invalid position_y"}
+        ] do
+      assert {:error, error} = AddText.execute(Map.put(base, key, value))
+      assert error =~ msg
+    end
+
+    assert {:error, "stroke_color is required when stroke_width is set"} =
+             AddText.execute(Map.put(base, "stroke_width", 0.1))
+
+    {:ok, draft} = ProjectStore.get_project(id)
+    text_track = Enum.find(draft["tracks"], fn track -> track["id"] == "track-001" end)
+    assert length(text_track["segments"]) == 1
+    assert draft["materials"]["texts"] == []
+  end
+
+  @tag :tmp_dir
+  test "AddText reports missing required arguments" do
+    assert {:error, msg} = AddText.execute(%{"project_id" => "x"})
+    assert msg =~ "Missing required arguments"
+  end
+
   alias CapcutMcp.Tools.{
     AddClip,
     MoveClip,

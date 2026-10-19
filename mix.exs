@@ -6,6 +6,7 @@ defmodule CapcutMcp.MixProject do
       app: :capcut_mcp,
       version: "0.1.0",
       elixir: "~> 1.15",
+      elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       dialyzer: [
@@ -45,9 +46,12 @@ defmodule CapcutMcp.MixProject do
     ]
   end
 
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
+
   def application do
     [
-      extra_applications: [:logger, :crypto],
+      extra_applications: [:logger, :crypto, :inets, :ssl],
       mod: {CapcutMcp.Application, []}
     ]
   end
